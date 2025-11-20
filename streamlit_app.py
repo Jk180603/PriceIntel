@@ -1,31 +1,30 @@
-# priceintel_live.py
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import random
 from datetime import datetime
 import time
-import random
 
 st.set_page_config(page_title="PriceIntel Live", layout="wide")
-st.title("PriceIntel — Real-Time Multi-Platform Price Tracker")
-st.markdown("**Live scraping**: Amazon.de • Zalando • Otto.de • MediaMarkt")
+st.title("PriceIntel – Real-Time E-Commerce Price Tracker")
+st.caption("Amazon.de • Zalando • Otto.de • MediaMarkt – Live Demo")
 
-# Simulate real data (replace later with your scraper)
+# Simulate real scraped data (will be replaced by Playwright later)
 def get_live_prices():
-    base_prices = {"Amazon.de": 1299, "Zalando": 1249, "Otto.de": 1279, "MediaMarkt": 1239}
-    shops = []
-    prices = []
-    for shop, base in base_prices.items():
-        variation = random.randint(-25, 25)
-        shops.append(shop)
-        prices.append(base + variation)
-    df = pd.DataFrame({"Shop": shops, "Price (€)": prices})
-    df["Time"] = datetime.now().strftime("%H:%M:%S")
+    base = {"Amazon.de": 1299, "Zalando": 1249, "Otto.de": 1279, "MediaMarkt": 1239}
+    data = []
+    for shop, price in base.items():
+        current_price = price + random.randint(-30, 30)
+        data.append({
+            "Shop": shop,
+            "Price (€)": current_price,
+            "Time": datetime.now().strftime("%H:%M:%S")
+        })
+    df = pd.DataFrame(data)
     df["Savings"] = df["Price (€)"].max() - df["Price (€)"]
     df["Best Deal"] = df["Savings"] == df["Savings"].max()
     return df
 
-# History storage
+# History in session state
 if "history" not in st.session_state:
     st.session_state.history = pd.DataFrame()
 
@@ -33,33 +32,32 @@ placeholder = st.empty()
 
 while True:
     df = get_live_prices()
-    
-    # Append to history
-    new_row = df[["Shop", "Price (€)", "Time"]].copy()
-    new_row["Date"] = datetime.now().strftime("%Y-%m-%d")
-    st.session_state.history = pd.concat([st.session_state.history, new_row.rename(columns={"Price (€)": "Price"})], ignore_index=True)
-    history = st.session_state.history.tail(40)  # last 10 updates
+
+    # Save to history
+    new = df[["Shop", "Price (€)", "Time"]].copy()
+    new["Date"] = datetime.now().strftime("%Y-%m-%d")
+    st.session_state.history = pd.concat([st.session_state.history, new.rename(columns={"Price (€)": "Price"})], ignore_index=True)
+    hist = st.session_state.history.tail(40)
 
     with placeholder.container():
-        col1, col2 = st.columns([1, 2])
+        c1, c2 = st.columns([1, 2])
 
-        with col1:
-            st.subheader("iPhone 16 Pro 256GB — Live Prices")
-            for _, row in df.iterrows():
-                color = "#00ff00" if row["Best Deal"] else "#ffffff"
-                st.markdown(f"<h2 style='color:{color};'>→ {row['Shop']}</h2>", unsafe_allow_html=True)
-                st.metric("Price", f"€{row['Price (€)']:,}", f"Save €{int(row['Savings'])}" if row['Savings'] > 0 else None)
-                st.caption(f"Updated: {row['Time']}")
+        with c1:
+            st.subheader("iPhone 16 Pro 256GB – Live Prices")
+            for _, r in df.iterrows():
+                color = "#00FF00" if r["Best Deal"] else "#FFFFFF"
+                st.markdown(f"<h2 style='color:{color};'>→ {r['Shop']}</h2>", unsafe_allow_html=True)
+                st.metric("Price", f"€{r['Price (€)']:,}", f"Save €{int(r['Savings'])}" if r['Savings']>0 else None)
+                st.caption(f"Updated {r['Time']}")
                 st.divider()
 
-        with col2:
-            st.subheader("Price Trend (Last 10 Updates)")
-            fig = px.line(history, x="Time", y="Price", color="Shop", markers=True,
-                          title="Live Price Evolution — Green = Current Best Deal")
-            fig.add_hline(y=df["Price (€)"].min(), line_dash="dash", line_color="green", annotation_text="Current Best")
-            st.plotly_chart(fig, use_container_width=True)
+        with c2:
+            st.subheader("Price Trend (Last Updates)")
+            chart_data = hist.copy()
+            chart_data["DateTime"] = chart_data["Date"] + " " + chart_data["Time"]
+            st.line_chart(chart_data.pivot(index="DateTime", columns="Shop", values="Price"), use_container_width=True)
 
-        st.success("REAL-TIME TRACKING ACTIVE — Updates every 30 seconds")
-        st.caption("Built by Jay Khakhar | github.com/JK180603 | For German Working Student Roles")
+        st.success("LIVE TRACKING ACTIVE – Updates every 30 seconds")
+        st.caption("Built by Jay Khakhar • github.com/JK180603")
 
     time.sleep(30)
